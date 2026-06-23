@@ -3,14 +3,12 @@ const prisma = require('../config/db');
 const getInvoices = async (req, res) => {
   const { search } = req.query;
   try {
-    let where = {};
+    let where = { userId: req.user.id };
     if (search) {
-      where = {
-        OR: [
-          { invoiceNumber: { contains: search, mode: 'insensitive' } },
-          { customer: { name: { contains: search, mode: 'insensitive' } } },
-        ],
-      };
+      where.OR = [
+        { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+      ];
     }
     const invoices = await prisma.invoice.findMany({
       where,
@@ -19,15 +17,14 @@ const getInvoices = async (req, res) => {
     });
     res.json(invoices);
   } catch (error) {
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Error' });
   }
 };
 
 const getInvoiceById = async (req, res) => {
-  const id = parseInt(req.params.id);
   try {
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: parseInt(req.params.id), userId: req.user.id },
       include: {
         customer: true,
         items: { include: { product: { include: { variants: true } } } },
@@ -42,53 +39,46 @@ const getInvoiceById = async (req, res) => {
 
 const createInvoice = async (req, res) => {
   const { customerId, items, deliveryCharges, discount } = req.body;
-  const result = await processInvoiceData(null, customerId, items, deliveryCharges, discount);
+  const result = await processInvoiceData(null, req.user.id, customerId, items, deliveryCharges, discount);
   if (result.error) return res.status(400).json({ message: result.error });
   res.status(201).json(result.data);
 };
 
 const updateInvoice = async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { customerId, items, deliveryCharges, discount } = req.body;
-  
-  try {
-    const existing = await prisma.invoice.findUnique({ 
-        where: { id }, 
-        include: { items: { include: { product: { include: { bundleItems: true, variants: true } } } } } 
-    });
-    if (!existing) return res.status(404).json({ message: "Invoice not found" });
-
-    await prisma.$transaction(async (tx) => {
-        for (const item of existing.items) {
-            if (item.product.hasVariants && item.selectedSize) {
-                const sizes = item.selectedSize.split(', ');
-                for (const s of sizes) {
-                    await tx.productVariant.updateMany({
-                        where: { productId: item.productId, size: s },
-                        data: { stock: { increment: 1 } }
-                    });
-                }
-            } else if (item.product.isBundle) {
-                for (const b of item.product.bundleItems) {
-                    await tx.product.update({ where: { id: b.productId }, data: { stock: { increment: item.quantity * b.quantity } } });
-                }
-            } else {
-                await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-            }
-        }
-        await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
-    });
-
-    const result = await processInvoiceData(id, customerId, items, deliveryCharges, discount);
-    if (result.error) throw new Error(result.error);
+    const id = parseInt(req.params.id);
+    const { customerId, items, deliveryCharges, discount } = req.body;
     
-    res.json(result.data);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+    try {
+      const existing = await prisma.invoice.findFirst({ 
+          where: { id, userId: req.user.id }, 
+          include: { items: { include: { product: { include: { bundleItems: true, variants: true } } } } } 
+      });
+      if (!existing) return res.status(404).json({ message: "Invoice not found" });
+  
+      await prisma.$transaction(async (tx) => {
+          for (const item of existing.items) {
+              if (item.product.hasVariants && item.selectedSize) {
+                  const sizesArr = item.selectedSize.split(', ');
+                  for (const s of sizesArr) {
+                      await tx.productVariant.updateMany({ where: { productId: item.productId, size: s }, data: { stock: { increment: 1 } } });
+                  }
+              } else if (item.product.isBundle) {
+                  for (const b of item.product.bundleItems) { await tx.product.update({ where: { id: b.productId }, data: { stock: { increment: item.quantity * b.quantity } } }); }
+              } else { await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } }); }
+          }
+          await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
+      });
+  
+      const result = await processInvoiceData(id, req.user.id, customerId, items, deliveryCharges, discount);
+      if (result.error) throw new Error(result.error);
+      
+      res.json(result.data);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
 };
 
-async function processInvoiceData(invoiceId, customerId, items, deliveryCharges, discount) {
+async function processInvoiceData(invoiceId, userId, customerId, items, deliveryCharges, discount) {
   const charges = parseFloat(deliveryCharges) || 0;
   const disc = parseFloat(discount) || 0;
 
@@ -98,12 +88,12 @@ async function processInvoiceData(invoiceId, customerId, items, deliveryCharges,
       const verifiedItems = [];
 
       for (const item of items) {
-        const product = await tx.product.findUnique({
-          where: { id: parseInt(item.productId) },
+        const product = await tx.product.findFirst({
+          where: { id: parseInt(item.productId), userId },
           include: { bundleItems: { include: { product: { include: { variants: true } } } }, variants: true }
         });
 
-        if (!product) throw new Error(`Product ${item.productId} not found`);
+        if (!product) throw new Error(`Product ID ${item.productId} not found`);
         const requestedQty = parseInt(item.quantity);
         let finalSizeString = "";
 
@@ -115,7 +105,7 @@ async function processInvoiceData(invoiceId, customerId, items, deliveryCharges,
                 const componentSizes = item.bundleComponentSizes?.[comp.id] || [];
 
                 if (comp.hasVariants) {
-                    if (componentSizes.length !== totalNeeded) throw new Error(`Select ${totalNeeded} sizes for ${comp.name}`);
+                    if (componentSizes.length !== totalNeeded) throw new Error(`Select sizes for ${comp.name}`);
                     const sizeCounts = {};
                     componentSizes.forEach(s => sizeCounts[s] = (sizeCounts[s] || 0) + 1);
                     for (const size in sizeCounts) {
@@ -133,7 +123,7 @@ async function processInvoiceData(invoiceId, customerId, items, deliveryCharges,
         } 
         else if (product.hasVariants) {
             const sizesArr = item.selectedSizes || [];
-            if (sizesArr.length !== requestedQty) throw new Error(`Select ${requestedQty} sizes for ${product.name}`);
+            if (sizesArr.length !== requestedQty) throw new Error(`Select sizes for ${product.name}`);
             const sizeCounts = {};
             sizesArr.forEach(s => sizeCounts[s] = (sizeCounts[s] || 0) + 1);
             for (const size in sizeCounts) {
@@ -155,6 +145,7 @@ async function processInvoiceData(invoiceId, customerId, items, deliveryCharges,
 
       const invoiceData = {
         customerId: parseInt(customerId),
+        userId: userId,
         totalAmount: totalAmount + charges - disc,
         deliveryCharges: charges,
         discount: disc,
@@ -180,29 +171,25 @@ async function processInvoiceData(invoiceId, customerId, items, deliveryCharges,
 }
 
 const deleteInvoice = async (req, res) => {
-    const id = parseInt(req.params.id);
     try {
-      const inv = await prisma.invoice.findUnique({ where: { id }, include: { items: { include: { product: { include: { bundleItems: true, variants: true } } } } } });
-      if (!inv) return res.status(404).json({ message: 'Not found' });
+        const id = parseInt(req.params.id);
+        const inv = await prisma.invoice.findFirst({ where: { id, userId: req.user.id }, include: { items: { include: { product: { include: { bundleItems: true, variants: true } } } } } });
+        if (!inv) return res.status(404).json({ message: 'Not found' });
   
-      await prisma.$transaction(async (tx) => {
-        for (const item of inv.items) {
-            if (item.product.hasVariants && item.selectedSize) {
-                const sizes = item.selectedSize.split(', ');
-                for (const s of sizes) {
-                    await tx.productVariant.updateMany({ where: { productId: item.productId, size: s }, data: { stock: { increment: 1 } } });
-                }
-            } else if (item.product.isBundle) {
-                for (const b of item.product.bundleItems) {
-                    await tx.product.update({ where: { id: b.productId }, data: { stock: { increment: item.quantity * b.quantity } } });
-                }
-            } else {
-                await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-            }
-        }
-        await tx.invoice.delete({ where: { id } });
-      });
-      res.json({ message: 'Deleted' });
+        await prisma.$transaction(async (tx) => {
+          for (const item of inv.items) {
+              if (item.product.hasVariants && item.selectedSize) {
+                  const sizes = item.selectedSize.split(', ');
+                  for (const s of sizes) {
+                      await tx.productVariant.updateMany({ where: { productId: item.productId, size: s }, data: { stock: { increment: 1 } } });
+                  }
+              } else if (item.product.isBundle) {
+                  for (const b of item.product.bundleItems) { await tx.product.update({ where: { id: b.productId }, data: { stock: { increment: item.quantity * b.quantity } } }); }
+              } else { await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } }); }
+          }
+          await tx.invoice.delete({ where: { id } });
+        });
+        res.json({ message: 'Deleted' });
     } catch (error) { res.status(500).json({ message: 'Error' }); }
 };
 
