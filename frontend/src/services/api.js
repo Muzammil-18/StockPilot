@@ -1,4 +1,4 @@
-const API_URL = 'https://stockpilot-backend-live.vercel.app/api';
+const API_URL = 'https://stockpilot-87fh.onrender.com/api';
 
 const fetchWithAuth = async (url, options = {}) => {
   const token = localStorage.getItem('token');
