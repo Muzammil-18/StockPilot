@@ -1,98 +1,58 @@
-# Inventory & Invoice Management System
+# StockPilot - Advanced Inventory & Invoice Management System
 
-A beginner-friendly, modern, and fully responsive full-stack Inventory & Invoice Management System built using React.js (Frontend), Node.js + Express.js (Backend), and PostgreSQL with Prisma ORM.
+StockPilot is a robust, full-stack ERP solution designed for modern businesses to streamline their inventory tracking, sales reporting, and professional invoicing workflows. 
 
-## Prerequisites
-
-Ensure you have the following installed on your system:
-1. **Node.js** (v16 or higher)
-2. **npm** (comes with Node.js)
-3. **PostgreSQL** (v14 or higher running locally)
+Built with the power of **PostgreSQL**, **Prisma**, **Node.js**, and **React**, it offers a secure multi-user environment with complete data isolation.
 
 ---
 
-## PostgreSQL Database Setup
+## Optimized for Desktop & Professional Use
 
-1. Open your PostgreSQL terminal (pgAdmin, psql, or any client tool).
-2. Create a new database named `inventory_db`:
-   ```sql
-   CREATE DATABASE inventory_db;
-   ```
-3. Verify that your PostgreSQL server is running on `localhost:5432`.
-4. Open the file `backend/.env` and update the connection credentials if necessary:
-   ```env
-   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/inventory_db?schema=public"
-   ```
-   Replace the first `postgres` with your database username and the second `postgres` with your database password.
+> **Note:** StockPilot is intentionally designed and optimized for **Desktops and Laptops**. 
+
+### Why Desktop Only?
+Administrative tasks like **complex multi-item invoice generation**, **nested product configuration**, and **detailed sales analysis** require significant screen real estate for accuracy and speed. We prioritize a high-precision workflow that ensures zero errors during data entry—something that can only be achieved on a professional workstation environment.
 
 ---
 
-## Installation & Database Migrations
+## Key Features
 
-### 1. Set Up Backend
-
-1. Open your terminal or Command Prompt.
-2. Navigate to the backend directory:
-   ```bash
-   cd "C:\Users\MURTAZA SB\inventory-system\backend"
-   ```
-3. Install the backend dependencies:
-   ```bash
-   npm install
-   ```
-4. Run the Prisma migration to create the tables in your PostgreSQL database:
-   ```bash
-   npx prisma migrate dev --name init
-   ```
-   This command creates the database tables and generates the Prisma Client.
-
-### 2. Set Up Frontend
-
-1. Open a second terminal window.
-2. Navigate to the frontend directory:
-   ```bash
-   cd "C:\Users\MURTAZA SB\inventory-system\frontend"
-   ```
-3. Install the frontend dependencies:
-   ```bash
-   npm install
-   ```
+- **Secure Multi-User System:** Complete data isolation using JWT authentication. User A can never see User B's data.
+- **Inventory Management:** Complete CRUD operations for products with unique SKU tracking.
+- **Product Bundling (Packages):** Create packages (sets) that contain multiple individual items. Selling a package automatically deducts stock from its components.
+- **Variant-Based Inventory:** Full support for product sizes (e.g., Boots size 7, 8, 9). Track individual stock levels per size.
+- **Professional Invoicing:** Generate VIP-style professional invoices with customizable delivery charges and discounts.
+- **VIP Print Layouts:** Elegant, print-ready templates for both individual invoices and bulk sales reports.
+- **Dynamic Reports:** Filter sales data by date range and generate instant revenue summaries.
+- **Cloud Database:** Integrated with Neon PostgreSQL for high availability and performance.
 
 ---
 
-## Running the Application
+## Tech Stack
 
-### 1. Start the Backend Server
+**Frontend:**
+- React.js (Vite)
+- React Router (SPA)
+- Modern CSS with Variable Accents
+- Context-less API Integration
 
-From the backend terminal:
-```bash
-npm run dev
-```
-The server will start on port `5000` (e.g., `http://localhost:5000`).
-
-### 2. Start the Frontend Dev Server
-
-From the frontend terminal:
-```bash
-npm run dev
-```
-The React development server will start on port `3000` (e.g., `http://localhost:3000`).
-
-Open `http://localhost:3000` in your web browser.
+**Backend:**
+- Node.js & Express
+- Prisma ORM (Object-Relational Mapping)
+- JWT (JSON Web Tokens) for Security
+- PostgreSQL (Hosted on Neon.tech)
 
 ---
 
-## How to Test the Flow
+## Getting Started
 
-1. **Register**: Navigate to the Register page, enter your Name, Email, and Password. Click register. It will automatically log you in and redirect you to the Dashboard.
-2. **Add Products**: Go to the Products page, click **Add Product** and fill in details (SKU, Category, Cost Price, Selling Price, Stock). Submit it.
-3. **Add Customers**: Go to the Customers page, click **Add Customer**, enter the Name and Phone (and optional Email/Address) and save.
-4. **Create Invoices**: Go to the Invoices page, click **Create Invoice**:
-   - Select the customer you created.
-   - Choose a product.
-   - Set the quantity (ensure it does not exceed the available stock).
-   - Check the automatically updated Subtotal and Grand Total.
-   - Click **Save Invoice**.
-   - Review how the stock level of your product automatically decreases.
-5. **Print Invoices**: Go to the Invoice details or listing, click the **Print** icon, and see the printer layout preview trigger automatically.
-6. **Reports**: Navigate to the Reports page to see aggregate totals (Total Sales, Invoices, Products, Customers) and lists of completed transactions.
+### Prerequisites
+- Node.js installed
+- PostgreSQL database (or Neon.tech URL)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Muzammil-18/StockPilot.git
+   cd StockPilot
